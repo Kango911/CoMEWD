@@ -23,10 +23,19 @@ string to_lower(const string& s) {
     return res;
 }
 
+// Вывод числа без лишних нулей
 void print_double(double d) {
-    cout << fixed << setprecision(10) << d;
-    // Удаляем лишние нули (для вывода значений команд evaluate/evaluate_derivative)
-    // Но тесты сравнивают числовые значения, так что формат не критичен.
+    double intpart;
+    if (fabs(modf(d, &intpart)) < 1e-12) {
+        cout << static_cast<long long>(intpart);
+    } else {
+        ostringstream oss;
+        oss << fixed << setprecision(10) << d;
+        string s = oss.str();
+        s.erase(s.find_last_not_of('0') + 1, string::npos);
+        if (s.back() == '.') s.pop_back();
+        cout << s;
+    }
 }
 
 bool is_function_name(const string& name) {
@@ -53,11 +62,14 @@ enum class TokenType {
 struct Token {
     TokenType type;
     double num_value;
-    string str_value;
+    string str_value;      // для IDENTIFIER и OPERATOR
+    string raw_value;      // для NUMBER – исходная строка
     size_t pos;
 
-    Token(TokenType t, double val, size_t p) : type(t), num_value(val), pos(p) {}
-    Token(TokenType t, const string& s, size_t p) : type(t), str_value(s), pos(p) {}
+    Token(TokenType t, double val, const string& raw, size_t p)
+        : type(t), num_value(val), raw_value(raw), pos(p) {}
+    Token(TokenType t, const string& s, size_t p)
+        : type(t), str_value(s), pos(p) {}
     Token(TokenType t, size_t p) : type(t), pos(p) {}
 };
 
@@ -136,7 +148,7 @@ private:
         double val;
         istringstream iss(num_str);
         iss >> val;
-        return Token(TokenType::NUMBER, val, start);
+        return Token(TokenType::NUMBER, val, num_str, start);
     }
 
     Token parse_identifier() {
@@ -183,7 +195,6 @@ public:
     Node* clone() const override { return new NumberNode(value); }
     Node* diff(const string&) const override { return new NumberNode(0); }
     string to_string() const override {
-        // Если число целое (с учётом погрешности), выводим без десятичной точки
         double intpart;
         if (fabs(modf(value, &intpart)) < 1e-12) {
             ostringstream oss;
@@ -193,7 +204,6 @@ public:
             ostringstream oss;
             oss << fixed << setprecision(10) << value;
             string s = oss.str();
-            // удаляем конечные нули
             s.erase(s.find_last_not_of('0') + 1, string::npos);
             if (s.back() == '.') s.pop_back();
             return s;
@@ -270,7 +280,7 @@ public:
 };
 
 // ============================================================================
-// BinaryOpNode (объявлен, но определён после FunctionNode)
+// BinaryOpNode (объявлен, определён после FunctionNode)
 // ============================================================================
 
 class BinaryOpNode : public Node {
@@ -579,7 +589,7 @@ private:
 };
 
 // ============================================================================
-// Режим лексера (отдельная функция для теста)
+// Режим лексера
 // ============================================================================
 
 void run_lexer_mode(const string& input) {
@@ -588,7 +598,7 @@ void run_lexer_mode(const string& input) {
         vector<Token> tokens = lexer.tokenize();
         for (const auto& tok : tokens) {
             if (tok.type == TokenType::NUMBER) {
-                cout << tok.num_value << endl;
+                cout << tok.raw_value << endl;
             } else if (tok.type == TokenType::IDENTIFIER) {
                 cout << tok.str_value << endl;
             } else if (tok.type == TokenType::OPERATOR) {
@@ -609,19 +619,11 @@ void run_lexer_mode(const string& input) {
 // ============================================================================
 
 int main() {
-    // Читаем первую строку, чтобы определить режим работы
     string first_line;
-    if (!getline(cin, first_line)) {
-        return 0;
-    }
-    if (first_line.empty()) {
-        return 0;
-    }
+    if (!getline(cin, first_line)) return 0;
+    if (first_line.empty()) return 0;
 
-    // Если первая строка не является командой (evaluate, derivative, evaluate_derivative),
-    // то считаем, что весь ввод — это одно выражение для лексера.
     if (first_line != "evaluate" && first_line != "derivative" && first_line != "evaluate_derivative") {
-        // Режим лексера: всё, что было считано, плюс остальной ввод
         string rest;
         string line;
         while (getline(cin, line)) {
@@ -633,21 +635,16 @@ int main() {
         return 0;
     }
 
-    // Основной режим: обработка команды
     try {
         string command_line = first_line;
         string n_line;
-        if (!getline(cin, n_line)) {
-            throw runtime_error("Missing number of variables");
-        }
+        if (!getline(cin, n_line)) throw runtime_error("Missing number of variables");
         int n = stoi(n_line);
 
         vector<string> var_names;
         while ((int)var_names.size() < n) {
             string line;
-            if (!getline(cin, line)) {
-                throw runtime_error("Insufficient variable names");
-            }
+            if (!getline(cin, line)) throw runtime_error("Insufficient variable names");
             istringstream iss(line);
             string name;
             while (iss >> name) {
@@ -659,9 +656,7 @@ int main() {
         vector<double> var_values;
         while ((int)var_values.size() < n) {
             string line;
-            if (!getline(cin, line)) {
-                throw runtime_error("Insufficient variable values");
-            }
+            if (!getline(cin, line)) throw runtime_error("Insufficient variable values");
             istringstream iss(line);
             double val;
             while (iss >> val) {
@@ -671,9 +666,7 @@ int main() {
         }
 
         string expr_str;
-        if (!getline(cin, expr_str)) {
-            throw runtime_error("Missing expression");
-        }
+        if (!getline(cin, expr_str)) throw runtime_error("Missing expression");
 
         map<string, double> var_map;
         for (int i = 0; i < n; ++i) {
@@ -691,16 +684,12 @@ int main() {
             print_double(result);
             cout << endl;
         } else if (command_line == "derivative") {
-            if (n == 0) {
-                throw runtime_error("No variable to differentiate by");
-            }
+            if (n == 0) throw runtime_error("No variable to differentiate by");
             string first_var = to_lower(var_names[0]);
             unique_ptr<Node> deriv(ast->diff(first_var));
             cout << deriv->to_string() << endl;
         } else if (command_line == "evaluate_derivative") {
-            if (n == 0) {
-                throw runtime_error("No variable to differentiate by");
-            }
+            if (n == 0) throw runtime_error("No variable to differentiate by");
             string first_var = to_lower(var_names[0]);
             unique_ptr<Node> deriv(ast->diff(first_var));
             double result = deriv->eval(var_map);
