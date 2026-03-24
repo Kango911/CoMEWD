@@ -23,10 +23,25 @@ string to_lower(const string& s) {
     return res;
 }
 
+// Форматирование числа для вывода в сообщениях об ошибках
+string format_double_for_error(double d) {
+    ostringstream oss;
+    oss << d;
+    string s = oss.str();
+    if (s.find('.') != string::npos) {
+        s.erase(s.find_last_not_of('0') + 1, string::npos);
+        if (s.back() == '.') s.pop_back();
+    }
+    return s;
+}
+
 // Вывод числа с удалением лишних нулей
 void print_double(double d) {
     if (isinf(d)) {
-        cout << "inf";
+        if (d > 0)
+            cout << "inf";
+        else
+            cout << "-inf";
         return;
     }
     if (isnan(d)) {
@@ -324,21 +339,32 @@ public:
         if (name == "cos") return cos(x);
         if (name == "tan") return tan(x);
         if (name == "asin") {
-            if (x < -1 || x > 1) throw runtime_error("Domain error: asin(" + std::to_string(x) + ")");
+            if (x < -1 || x > 1) {
+                throw runtime_error("Domain error: asin(" + format_double_for_error(x) + ")");
+            }
             return asin(x);
         }
         if (name == "acos") {
-            if (x < -1 || x > 1) throw runtime_error("Domain error: acos(" + std::to_string(x) + ")");
+            if (x < -1 || x > 1) {
+                throw runtime_error("Domain error: acos(" + format_double_for_error(x) + ")");
+            }
             return acos(x);
         }
         if (name == "atan") return atan(x);
         if (name == "exp") return exp(x);
         if (name == "log") {
-            if (x <= 0) throw runtime_error("Domain error: log(" + std::to_string(x) + ")");
+            if (x < 0) {
+                throw runtime_error("Domain error: log(" + format_double_for_error(x) + ")");
+            }
+            if (x == 0) {
+                return -INFINITY;
+            }
             return log(x);
         }
         if (name == "sqrt") {
-            if (x < 0) throw runtime_error("Domain error: sqrt(" + std::to_string(x) + ")");
+            if (x < 0) {
+                throw runtime_error("Domain error: sqrt(" + format_double_for_error(x) + ")");
+            }
             return sqrt(x);
         }
         throw runtime_error("Unknown function: " + name);
