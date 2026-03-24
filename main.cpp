@@ -23,7 +23,7 @@ string to_lower(const string& s) {
     return res;
 }
 
-// Вывод числа с округлением до 6 знаков после запятой
+// Вывод числа с удалением лишних нулей
 void print_double(double d) {
     if (isinf(d)) {
         cout << "inf";
@@ -34,21 +34,18 @@ void print_double(double d) {
         return;
     }
 
-    // Округляем до 6 знаков после запятой
-    double rounded = round(d * 1e5) / 1e5;
+    // Используем стандартный вывод double
+    ostringstream oss;
+    oss << d;
+    string s = oss.str();
 
-    double intpart;
-    if (fabs(modf(rounded, &intpart)) < 1e-12) {
-        cout << static_cast<long long>(intpart);
-    } else {
-        ostringstream oss;
-        oss << fixed << setprecision(6) << rounded;
-        string s = oss.str();
-        // Удаляем конечные нули
+    // Удаляем конечные нули, но оставляем хотя бы один знак после запятой если есть
+    if (s.find('.') != string::npos) {
         s.erase(s.find_last_not_of('0') + 1, string::npos);
         if (s.back() == '.') s.pop_back();
-        cout << s;
     }
+
+    cout << s;
 }
 
 bool is_function_name(const string& name) {
@@ -208,21 +205,14 @@ public:
     Node* clone() const override { return new NumberNode(value); }
     Node* diff(const string&) const override { return new NumberNode(0); }
     string to_string() const override {
-        double intpart;
-        if (fabs(modf(value, &intpart)) < 1e-12) {
-            ostringstream oss;
-            oss << static_cast<long long>(intpart);
-            return oss.str();
-        } else {
-            // Для вывода производной округляем до 6 знаков
-            double rounded = round(value * 1e6) / 1e6;
-            ostringstream oss;
-            oss << fixed << setprecision(6) << rounded;
-            string s = oss.str();
+        ostringstream oss;
+        oss << value;
+        string s = oss.str();
+        if (s.find('.') != string::npos) {
             s.erase(s.find_last_not_of('0') + 1, string::npos);
             if (s.back() == '.') s.pop_back();
-            return s;
         }
+        return s;
     }
     bool is_constant() const override { return true; }
 };
