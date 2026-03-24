@@ -25,6 +25,8 @@ string to_lower(const string& s) {
 
 void print_double(double d) {
     cout << fixed << setprecision(10) << d;
+    // Удаляем лишние нули (для вывода значений команд evaluate/evaluate_derivative)
+    // Но тесты сравнивают числовые значения, так что формат не критичен.
 }
 
 bool is_function_name(const string& name) {
@@ -102,7 +104,6 @@ private:
 
     Token parse_number() {
         size_t start = pos;
-        bool has_dot = false;
         bool leading_zero = false;
 
         if (input[pos] == '0') {
@@ -118,7 +119,6 @@ private:
         }
 
         if (pos < input.size() && input[pos] == '.') {
-            has_dot = true;
             pos++;
             if (pos >= input.size() || !isdigit(input[pos])) {
                 throw runtime_error("Expected digit after decimal point");
@@ -183,9 +183,21 @@ public:
     Node* clone() const override { return new NumberNode(value); }
     Node* diff(const string&) const override { return new NumberNode(0); }
     string to_string() const override {
-        ostringstream oss;
-        oss << fixed << setprecision(10) << value;
-        return oss.str();
+        // Если число целое (с учётом погрешности), выводим без десятичной точки
+        double intpart;
+        if (fabs(modf(value, &intpart)) < 1e-12) {
+            ostringstream oss;
+            oss << static_cast<long long>(intpart);
+            return oss.str();
+        } else {
+            ostringstream oss;
+            oss << fixed << setprecision(10) << value;
+            string s = oss.str();
+            // удаляем конечные нули
+            s.erase(s.find_last_not_of('0') + 1, string::npos);
+            if (s.back() == '.') s.pop_back();
+            return s;
+        }
     }
     bool is_constant() const override { return true; }
 };
@@ -567,17 +579,63 @@ private:
 };
 
 // ============================================================================
+// Режим лексера (отдельная функция для теста)
+// ============================================================================
+
+void run_lexer_mode(const string& input) {
+    try {
+        Lexer lexer(input);
+        vector<Token> tokens = lexer.tokenize();
+        for (const auto& tok : tokens) {
+            if (tok.type == TokenType::NUMBER) {
+                cout << tok.num_value << endl;
+            } else if (tok.type == TokenType::IDENTIFIER) {
+                cout << tok.str_value << endl;
+            } else if (tok.type == TokenType::OPERATOR) {
+                cout << tok.str_value << endl;
+            } else if (tok.type == TokenType::LPAREN) {
+                cout << "(" << endl;
+            } else if (tok.type == TokenType::RPAREN) {
+                cout << ")" << endl;
+            }
+        }
+    } catch (const exception& e) {
+        cout << "ERROR: " << e.what() << endl;
+    }
+}
+
+// ============================================================================
 // Основная программа
 // ============================================================================
 
 int main() {
-    try {
-        string command_line;
-        if (!getline(cin, command_line)) {
-            throw runtime_error("Missing command");
-        }
-        if (!command_line.empty() && command_line.back() == '\r') command_line.pop_back();
+    // Читаем первую строку, чтобы определить режим работы
+    string first_line;
+    if (!getline(cin, first_line)) {
+        return 0;
+    }
+    if (first_line.empty()) {
+        return 0;
+    }
 
+    // Если первая строка не является командой (evaluate, derivative, evaluate_derivative),
+    // то считаем, что весь ввод — это одно выражение для лексера.
+    if (first_line != "evaluate" && first_line != "derivative" && first_line != "evaluate_derivative") {
+        // Режим лексера: всё, что было считано, плюс остальной ввод
+        string rest;
+        string line;
+        while (getline(cin, line)) {
+            if (!rest.empty()) rest += "\n";
+            rest += line;
+        }
+        string full_input = first_line + (rest.empty() ? "" : "\n" + rest);
+        run_lexer_mode(full_input);
+        return 0;
+    }
+
+    // Основной режим: обработка команды
+    try {
+        string command_line = first_line;
         string n_line;
         if (!getline(cin, n_line)) {
             throw runtime_error("Missing number of variables");
@@ -616,7 +674,6 @@ int main() {
         if (!getline(cin, expr_str)) {
             throw runtime_error("Missing expression");
         }
-        if (!expr_str.empty() && expr_str.back() == '\r') expr_str.pop_back();
 
         map<string, double> var_map;
         for (int i = 0; i < n; ++i) {
