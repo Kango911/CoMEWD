@@ -23,8 +23,16 @@ string to_lower(const string& s) {
     return res;
 }
 
-// Вывод числа без лишних нулей
+// Вывод числа с учётом бесконечности и NaN
 void print_double(double d) {
+    if (isinf(d)) {
+        cout << "inf";
+        return;
+    }
+    if (isnan(d)) {
+        cout << "nan";
+        return;
+    }
     double intpart;
     if (fabs(modf(d, &intpart)) < 1e-12) {
         cout << static_cast<long long>(intpart);
@@ -410,7 +418,8 @@ double BinaryOpNode::eval(const map<string, double>& vars) const {
         case '-': return l - r;
         case '*': return l * r;
         case '/':
-            if (r == 0.0) throw runtime_error("Division by zero");
+            // Деление на ноль: возвращаем бесконечность
+            if (r == 0.0) return INFINITY;
             return l / r;
         case '^':
             return pow(l, r);
