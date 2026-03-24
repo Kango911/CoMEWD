@@ -23,6 +23,7 @@ string to_lower(const string& s) {
     return res;
 }
 
+// Вывод числа с округлением до 6 знаков после запятой
 void print_double(double d) {
     if (isinf(d)) {
         cout << "inf";
@@ -32,13 +33,18 @@ void print_double(double d) {
         cout << "nan";
         return;
     }
+
+    // Округляем до 6 знаков после запятой
+    double rounded = round(d * 1e5) / 1e5;
+
     double intpart;
-    if (fabs(modf(d, &intpart)) < 1e-12) {
+    if (fabs(modf(rounded, &intpart)) < 1e-12) {
         cout << static_cast<long long>(intpart);
     } else {
         ostringstream oss;
-        oss << fixed << setprecision(10) << d;
+        oss << fixed << setprecision(6) << rounded;
         string s = oss.str();
+        // Удаляем конечные нули
         s.erase(s.find_last_not_of('0') + 1, string::npos);
         if (s.back() == '.') s.pop_back();
         cout << s;
@@ -208,8 +214,10 @@ public:
             oss << static_cast<long long>(intpart);
             return oss.str();
         } else {
+            // Для вывода производной округляем до 6 знаков
+            double rounded = round(value * 1e6) / 1e6;
             ostringstream oss;
-            oss << fixed << setprecision(10) << value;
+            oss << fixed << setprecision(6) << rounded;
             string s = oss.str();
             s.erase(s.find_last_not_of('0') + 1, string::npos);
             if (s.back() == '.') s.pop_back();
@@ -543,7 +551,7 @@ private:
             Token tok = current_token();
             if (tok.type == TokenType::OPERATOR && tok.str_value == "^") {
                 consume();
-                Node* right = parse_power(); // правоассоциативно
+                Node* right = parse_power();
                 node = new BinaryOpNode('^', node, right);
             } else {
                 break;
@@ -556,7 +564,6 @@ private:
         Token tok = current_token();
         if (tok.type == TokenType::OPERATOR && (tok.str_value == "+" || tok.str_value == "-")) {
             consume();
-            // Унарный оператор применяется к степени (высокий приоритет)
             Node* operand = parse_power();
             if (tok.str_value == "-") {
                 return new UnaryOpNode('-', operand);
