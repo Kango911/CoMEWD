@@ -23,7 +23,6 @@ string to_lower(const string& s) {
     return res;
 }
 
-// Вывод числа с учётом бесконечности и NaN
 void print_double(double d) {
     if (isinf(d)) {
         cout << "inf";
@@ -418,7 +417,6 @@ double BinaryOpNode::eval(const map<string, double>& vars) const {
         case '-': return l - r;
         case '*': return l * r;
         case '/':
-            // Деление на ноль: возвращаем бесконечность
             if (r == 0.0) return INFINITY;
             return l / r;
         case '^':
@@ -541,11 +539,15 @@ private:
 
     Node* parse_power() {
         Node* node = parse_unary();
-        Token tok = current_token();
-        if (tok.type == TokenType::OPERATOR && tok.str_value == "^") {
-            consume();
-            Node* right = parse_power();
-            node = new BinaryOpNode('^', node, right);
+        while (true) {
+            Token tok = current_token();
+            if (tok.type == TokenType::OPERATOR && tok.str_value == "^") {
+                consume();
+                Node* right = parse_power(); // правоассоциативно
+                node = new BinaryOpNode('^', node, right);
+            } else {
+                break;
+            }
         }
         return node;
     }
@@ -554,7 +556,8 @@ private:
         Token tok = current_token();
         if (tok.type == TokenType::OPERATOR && (tok.str_value == "+" || tok.str_value == "-")) {
             consume();
-            Node* operand = parse_unary();
+            // Унарный оператор применяется к степени (высокий приоритет)
+            Node* operand = parse_power();
             if (tok.str_value == "-") {
                 return new UnaryOpNode('-', operand);
             } else {
